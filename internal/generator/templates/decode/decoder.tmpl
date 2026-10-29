@@ -1,0 +1,14 @@
+func {{ .DecoderName }}(value any, out *{{ .TypeName }}) error {
+    {{- if .HasFields }}
+        root, err := frankenPHPMap(value)
+        if err != nil {
+            return err
+        }
+
+        {{- range .Fields }}
+        {{ template "decode/decode_field.tmpl" . }}
+        {{- end }}
+    {{- end }}
+
+    return nil
+}

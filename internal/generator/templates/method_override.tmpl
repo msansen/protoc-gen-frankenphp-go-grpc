@@ -1,0 +1,7 @@
+{{- if .IsUnary }}
+    {{ .MethodName }} func({{ .Context }}, *{{ .Input }}) (*{{ .Output }}, error)
+{{- else if .IsServerStream }}
+    {{ .MethodName }} func(*{{ .Input }}, {{ .Stream }}) error
+{{- else }}
+    {{ .MethodName }} func({{ .Stream }}) error
+{{- end }}

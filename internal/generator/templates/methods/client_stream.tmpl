@@ -1,0 +1,23 @@
+func (s *{{ .ServerName }}) {{ .MethodName }}(stream {{ .Stream }}) error {
+	if s.options.{{ .MethodName }} != nil { return s.options.{{ .MethodName }}(stream) }
+	payload := make([]map[string]any, 0)
+	for {
+		in, err := stream.Recv()
+		if err == {{ .EOF }} { break }
+		if err != nil { return err }
+		payload = append(payload, {{ .RequestEncoder }}(in))
+	}
+	{{ template "methods/request_handler.tmpl" . }}
+
+	if err != nil {
+		if _, ok := {{ grpcStatus "FromError" }}(err); ok {
+			return err
+		}
+
+		return {{ grpcStatus "Error" }}({{ grpcCodes "Internal" }}, "PHP handler failed")
+	}
+
+	var out {{ .Output }}
+	if err := {{ .ResponseDecoder }}(response, &out); err != nil { return err }
+	return stream.SendAndClose(&out)
+}

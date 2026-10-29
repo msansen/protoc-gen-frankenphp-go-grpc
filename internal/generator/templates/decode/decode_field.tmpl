@@ -1,0 +1,15 @@
+    if raw, ok := root["{{ .Key }}"]; ok {
+    {{- if eq .Kind "scalar" }}
+        {{ template "decode/types/scalar.tmpl" . }}
+    {{- else if eq .Kind "optional" }}
+        {{ template "decode/types/scalar_optional.tmpl" . }}
+    {{- else if eq .Kind "message" }}
+        {{ template "decode/types/nested_message.tmpl" . }}
+    {{- else if eq .Kind "list" }}
+        {{ template "decode/types/list.tmpl" . }}
+    {{- else if eq .Kind "map" }}
+        {{ template "decode/types/map.tmpl" . }}
+    {{- else if eq .Kind "oneof" }}
+        {{ template "decode/types/one_of.tmpl" . }}
+    {{- end }}
+    }

@@ -1,0 +1,11 @@
+    if in.{{ .Target }} != nil {
+        v := make(map[string]any, len(in.{{ .Target }}))
+        for key, item := range in.{{ .Target }} {
+            {{- if .IsStringKey }}
+                v[key] = {{ .Expr }}
+            {{- else }}
+                v[fmt.Sprint(key)] = {{ .Expr }}
+            {{- end }}
+        }
+        out["{{ .Key }}"] = v
+    }

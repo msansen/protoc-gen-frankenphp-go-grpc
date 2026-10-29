@@ -1,0 +1,5 @@
+    v, err := {{ .DecodeHelper }}
+    if err != nil {
+        return err
+    }
+    out.{{ .Target }} = {{ .GoType }}(v)

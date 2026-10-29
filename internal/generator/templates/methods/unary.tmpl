@@ -1,0 +1,21 @@
+func (s *{{ .ServerName }}) {{ .MethodName }}(ctx {{ .Context }}, in *{{ .Input }}) (*{{ .Output }}, error) {
+	if s.options.{{ .MethodName }} != nil { return s.options.{{ .MethodName }}(ctx, in) }
+	payload := {{ .RequestEncoder }}(in)
+
+	{{ template "methods/request_handler.tmpl" . }}
+
+	if err != nil {
+		if _, ok := {{ grpcStatus "FromError" }}(err); ok {
+			return nil, err
+		}
+
+		return nil, {{ grpcStatus "Error" }}({{ grpcCodes "Internal" }}, "PHP handler failed")
+	}
+
+
+
+	var out {{ .Output }}
+	if err := {{ .ResponseDecoder }}(response, &out); err != nil { return nil, err }
+	return &out, nil
+}
+

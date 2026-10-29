@@ -1,0 +1,5 @@
+    v := &{{ .QualifiedGoIdent }}{}
+    if err := frankenPHPDecode{{ .MessageGoName }}(raw, v); err != nil {
+        return err
+    }
+    out.{{ .Target }} = v

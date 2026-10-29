@@ -1,0 +1,7 @@
+    if in.{{ .Target }} != nil {
+        v := make([]any, 0, len(in.{{ .Target }}))
+        for _, item := range in.{{ .Target }} {
+            v = append(v, {{ .Expr }})
+        }
+        out["{{ .Key }}"] = v
+    }

@@ -1,0 +1,17 @@
+    {{- if .HasMessage }}
+        v := &{{ .MessageType }}{}
+        if err := frankenPHPDecode{{ .MessageGoName }}(raw, v); err != nil {
+        return err
+        }
+        out.{{ .Target }} = &{{ .WrapperName }}{
+        {{ .GoName }}: v,
+        }
+    {{- else }}
+        v, err := {{ .DecodeHelper }}
+        if err != nil {
+        return err
+        }
+        out.{{ .Target }} = &{{ .WrapperName }}{
+        {{ .GoName }}: {{ .GoType }}(v),
+        }
+    {{- end }}

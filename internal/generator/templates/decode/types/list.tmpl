@@ -1,0 +1,21 @@
+    items, err := frankenPHPList(raw);
+    if err != nil {
+        return err
+    }
+    out.{{ .GoName }} = make([]{{ .ElementGoType }}, 0, len(items))
+    for _, item := range items {
+        {{- if .HasMessage }}
+            v := &{{ .MessageGoName }}{}
+            if err := frankenPHPDecode{{ .MessageGoName }}(item, v); err != nil {
+                return err
+            }
+
+            out.{{ .Target }} = append(out.{{ .Target }}, v)
+        {{- else }}
+            v, err := {{ .DecodeHelper }}
+            if err != nil {
+                return err
+            }
+            out.{{ .Target }} = append(out.{{ .Target }}, {{ .ElementGoType }}(v))
+        {{- end }}
+    }

@@ -1,0 +1,27 @@
+    m, err := frankenPHPMap(raw)
+    if err != nil {
+        return err
+    }
+
+    out.{{- .Target }} = make(map[{{- .KeyGoType }}]{{- .ValueGoType }}, len(m))
+    for key, item := range m {
+        keyValue, err := {{ .KeyHelper }}({{- .Key }})
+        if err != nil {
+            return err
+        }
+
+        {{- if .HasMessage  }}
+            itemValue := &{{- .ValueMessageGoName }}{}
+            if err := frankenPHPDecode{{- .ValueMessageGoName }}(item, itemValue); err != nil {
+                return err
+            }
+
+            out.{{- .Target }}[{{ .KeyGoType }}(keyValue)] = itemValue
+        {{- else }}
+            itemValue, err := {{ .DecodeHelper }}
+            if err != nil {
+                return err
+            }
+            out.{{- .Target }}[{{ .KeyGoType }}(keyValue)] = {{ .ValueFieldGoType }}(itemValue)
+        {{- end }}
+    }

@@ -1,0 +1,11 @@
+func {{ .EncoderName }}(in *{{ .TypeName }}) map[string]any {
+    if in == nil { return nil }
+
+    out := make(map[string]any)
+
+    {{- range .Fields }}
+    {{ template "encode/encode_field.tmpl" . }}
+    {{- end }}
+
+    return out
+}

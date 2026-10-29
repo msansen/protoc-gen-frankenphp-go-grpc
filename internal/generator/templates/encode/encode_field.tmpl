@@ -1,0 +1,13 @@
+    {{- if eq .Kind "scalar" }}
+        {{ template "encode/types/scalar.tmpl" . }}
+    {{- else if eq .Kind "optional" }}
+        {{ template "encode/types/scalar_optional.tmpl" . }}
+    {{- else if eq .Kind "message" }}
+        {{ template "encode/types/nested_message.tmpl" . }}
+    {{- else if eq .Kind "list" }}
+        {{ template "encode/types/list.tmpl" . }}
+    {{- else if eq .Kind "map" }}
+        {{ template "encode/types/map.tmpl" . }}
+    {{- else if eq .Kind "oneof" }}
+        {{ template "encode/types/one_of.tmpl" . }}
+    {{- end }}

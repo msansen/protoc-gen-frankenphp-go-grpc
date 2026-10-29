@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package test.v1;
+
+option go_package = "github.com/msansen/protoc-gen-frankenphp-go-grpc/testdata/generated;generated";
+
+message UnaryRequest {
+  string message = 1;
+
+  optional string password = 2;
+  optional int32 priority = 3;
+  optional bool enabled = 4;
+
+  repeated string tags = 5;
+  map<string, string> metadata = 6;
+
+  oneof authentication {
+    string token = 7;
+    uint32 user_id = 8;
+    Credentials credentials = 9;
+  }
+
+  // non-string map keys.
+  map<int32, string> prices = 10;
+}
+
+message Credentials {
+  string username = 1;
+  string password = 2;
+}
+
+message UnaryResponse {
+  string message = 1;
+  Status status = 2;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_DISABLED = 2;
+}
+
+message ServerStreamRequest {}
+
+message StreamRequest {
+  uint32 sequence = 1;
+}
+
+message StreamResponse {
+  uint32 sequence = 1;
+  string message = 2;
+}
+
+message ClientStreamResponse {}
+
+service TestService {
+  rpc Unary(UnaryRequest) returns (UnaryResponse);
+  rpc ServerStream(ServerStreamRequest) returns (stream StreamResponse);
+  rpc ClientStream(stream StreamRequest) returns (ClientStreamResponse);
+  rpc BidiStream(stream StreamRequest) returns (stream StreamResponse);
+}

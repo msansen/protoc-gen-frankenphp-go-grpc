@@ -1,0 +1,22 @@
+func (s *{{ .ServerName }}) {{ .MethodName }}(in *{{ .Input }}, stream {{ .Stream }}) error {
+	if s.options.{{ .MethodName }} != nil { return s.options.{{ .MethodName }}(in, stream) }
+	payload := {{ .RequestEncoder }}(in)
+	{{ template "methods/request_handler.tmpl" . }}
+
+	if err != nil {
+		if _, ok := {{ grpcStatus "FromError" }}(err); ok {
+			return err
+		}
+
+		return {{ grpcStatus "Error" }}({{ grpcCodes "Internal" }}, "PHP handler failed")
+	}
+
+	items, err := frankenPHPResponseSlice(response, "messages")
+	if err != nil { return err }
+	for _, item := range items {
+		var out {{ .Output }}
+		if err := {{ .StreamItemDecoder }}(item, &out); err != nil { return err }
+		if err := stream.Send(&out); err != nil { return err }
+	}
+	return nil
+}

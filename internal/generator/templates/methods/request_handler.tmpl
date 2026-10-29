@@ -1,0 +1,16 @@
+var request any = payload
+if !s.options.DisableEnvelope {
+    request = map[string]any{
+        "__frankenphp_grpc": map[string]any{
+            "method": "{{ .RequestData.MethodName }}",
+            "version": {{ envelopeFormatVersion }},
+            "payload": payload,
+        },
+    }
+}
+
+response, err := {{ .RequestData.HandlerMethodName }}({{ .ContextExpr }}, request)
+
+if err == nil && !s.options.DisableEnvelope {
+    response, err = frankenPHPUnwrapResponse(response, {{ envelopeFormatVersion }})
+}

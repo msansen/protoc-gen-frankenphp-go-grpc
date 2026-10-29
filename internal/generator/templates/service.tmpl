@@ -1,0 +1,33 @@
+// {{ .OptionsName }} contains optional native-Go overrides. A nil override falls back to PHP.
+type {{ .OptionsName }} struct {
+	DisableEnvelope bool `default:"false"`
+	{{- range .Methods }}
+		{{- template "method_override.tmpl" . }}
+	{{- end }}
+}
+
+type {{ .ServerName }} struct {
+	Unimplemented{{ .ServiceName }}Server
+	options {{ .OptionsName }}
+}
+
+func {{ .ConstructorName }}(options {{ .OptionsName }}) *{{ .ServerName }} {
+	return &{{ .ServerName }}{options: options}
+}
+
+func {{ .RegisterName }}(registrar {{ .ServiceRegistrar }}, options {{ .OptionsName }}) {
+	Register{{ .ServiceName }}Server(registrar, {{ .ConstructorName }}(options))
+}
+
+// Service methods
+{{- range .Methods }}
+	{{ if .IsUnary }}
+		{{ template "methods/unary.tmpl" . }}
+	{{ else if .IsServerStream }}
+		{{ template "methods/server_stream.tmpl" . }}
+	{{ else if .IsClientStream }}
+		{{ template "methods/client_stream.tmpl" . }}
+	{{ else if .IsBidirectionalStream }}
+		{{ template "methods/bidi_stream.tmpl" . }}
+	{{ end }}
+{{- end }}
