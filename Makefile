@@ -23,13 +23,13 @@ tools:					## Installs protoc-gen-go, protoc-gen-go-grpc
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-generate: build			## Generates files for testdata/proto/server-test.proto
+generate: build			## Generates files for the test proto fixtures
 	mkdir -p testdata/generated
 	PATH="$$PWD/bin:$$PATH" protoc -I testdata/proto \
 		--go_out=testdata/generated --go_opt=paths=source_relative \
 		--go-grpc_out=testdata/generated --go-grpc_opt=paths=source_relative \
 		--frankenphp-go-grpc_out=testdata/generated --frankenphp-go-grpc_opt=paths=source_relative \
-		testdata/proto/server-test.proto
+		testdata/proto/server-test.proto testdata/proto/second-service-test.proto
 
 docker-build:			## Builds docker image locally
 	docker build --target binary -t protoc-gen-frankenphp-go-grpc:local .

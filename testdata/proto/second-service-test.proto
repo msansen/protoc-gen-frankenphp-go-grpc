@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package test.v1;
+
+import "server-test.proto";
+
+option go_package = "github.com/msansen/protoc-gen-frankenphp-go-grpc/testdata/generated;generated";
+
+message SecondServiceRequest {
+  string message = 1;
+  Credentials credentials = 2;
+}
+
+message SecondServiceResponse {
+  string message = 1;
+}
+
+// Generate alongside server-test.proto to exercise package-level collisions.
+service SecondTestService {
+  // Shared RPC types exercise duplicate encoders and decoders across files.
+  rpc SharedUnary(UnaryRequest) returns (UnaryResponse);
+
+  // Distinct RPC types also share the nested Credentials encoder.
+  rpc Unary(SecondServiceRequest) returns (SecondServiceResponse);
+}
