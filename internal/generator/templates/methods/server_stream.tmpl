@@ -11,7 +11,7 @@ func (s *{{ .ServerName }}) {{ .MethodName }}(in *{{ .Input }}, stream {{ .Strea
 		return {{ grpcStatus "Error" }}({{ grpcCodes "Internal" }}, "PHP handler failed")
 	}
 
-	items, err := frankenPHPResponseSlice(response, "messages")
+	items, err := {{ runtime "ResponseSlice" }}(response, "messages")
 	if err != nil { return err }
 	for _, item := range items {
 		var out {{ .Output }}

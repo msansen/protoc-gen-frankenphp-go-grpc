@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	runtimePackage    = protogen.GoImportPath("github.com/msansen/protoc-gen-frankenphp-go-grpc/runtime")
 	contextPackage    = protogen.GoImportPath("context")
 	frankenphpPackage = protogen.GoImportPath("github.com/dunglas/frankenphp")
 	phpGrpcPackage    = protogen.GoImportPath("github.com/dunglas/frankenphp-grpc")
@@ -27,7 +28,6 @@ type fileData struct {
 	Services        []serviceData
 	MessageEncoders []MessageEncoderData
 	MessageDecoders []MessageDecoderData
-	HelpersData     helpersData
 }
 
 type serviceData struct {
@@ -62,12 +62,6 @@ type requestData struct {
 	MethodName        string
 	HandlerMethodName string
 	NeedEnvelope      bool `default:"true"`
-}
-
-type helpersData struct {
-	AssociativeArray string
-	Errorf           string
-	ParseUint        string
 }
 
 func Generate(plugin *protogen.Plugin, cfg Config, version string) error {
@@ -146,12 +140,6 @@ func generateFile(
 		}
 
 		fileData.MessageDecoders = append(fileData.MessageDecoders, *decoder)
-	}
-
-	fileData.HelpersData = helpersData{
-		AssociativeArray: protoFile.QualifiedGoIdent(frankenphpPackage.Ident("AssociativeArray[any]")),
-		Errorf:           protoFile.QualifiedGoIdent(fmtPackage.Ident("Errorf")),
-		ParseUint:        protoFile.QualifiedGoIdent(strconvPackage.Ident("ParseUint")),
 	}
 
 	content, err := executeTemplate(templates, "file.tmpl", fileData)

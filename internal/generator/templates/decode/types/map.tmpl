@@ -1,4 +1,4 @@
-    m, err := frankenPHPMap(raw)
+    m, err := {{ runtime "Map" }}(raw)
     if err != nil {
         return err
     }

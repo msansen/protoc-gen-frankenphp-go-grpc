@@ -4,7 +4,7 @@
             {{- if .IsStringKey }}
                 v[key] = {{ .Expr }}
             {{- else }}
-                v[fmt.Sprint(key)] = {{ .Expr }}
+                v[{{ fmt "Sprint" }}(key)] = {{ .Expr }}
             {{- end }}
         }
         out["{{ .Key }}"] = v

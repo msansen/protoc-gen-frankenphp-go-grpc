@@ -17,8 +17,3 @@ package {{ .Package }}
 {{- range .MessageDecoders }}
     {{ template "decode/decoder.tmpl" .}}
 {{ end }}
-
-// Helpers
-{{ template "helpers.tmpl" .HelpersData }}
-
-{{ template "bridge.tmpl" . }}

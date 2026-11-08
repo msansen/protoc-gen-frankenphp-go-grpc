@@ -96,14 +96,14 @@ func newMessageEncoderData(protoFile *protogen.GeneratedFile, message *protogen.
 	if len(message.Fields) > 0 {
 		messageData.HasFields = true
 		for _, field := range message.Fields {
-			messageData.Fields = append(messageData.Fields, getFieldDataForEncode(field))
+			messageData.Fields = append(messageData.Fields, getFieldDataForEncode(protoFile, field))
 		}
 	}
 
 	return messageData, nil
 }
 
-func getFieldDataForEncode(field *protogen.Field) EncodeField {
+func getFieldDataForEncode(protoFile *protogen.GeneratedFile, field *protogen.Field) EncodeField {
 	base := BaseEncodeField{
 		Key:       string(field.Desc.Name()),
 		GoName:    field.GoName,
@@ -116,21 +116,21 @@ func getFieldDataForEncode(field *protogen.Field) EncodeField {
 		fieldData := &OneofEncodeField{BaseEncodeField: base}
 		fieldData.Target = field.Oneof.GoName
 		fieldData.WrapperName = field.Parent.GoIdent.GoName + "_" + field.GoName
-		fieldData.Expr = encodeExpr(field, "in.Get"+field.GoName+"()")
+		fieldData.Expr = encodeExpr(protoFile, field, "in.Get"+field.GoName+"()")
 
 		return fieldData
 	}
 
 	if field.Desc.IsList() {
 		fieldData := &ListEncodeField{BaseEncodeField: base}
-		fieldData.Expr = encodeExpr(field, "item")
+		fieldData.Expr = encodeExpr(protoFile, field, "item")
 
 		return fieldData
 	}
 
 	if field.Desc.IsMap() {
 		fieldData := &MapEncodeField{BaseEncodeField: base}
-		fieldData.Expr = encodeExpr(field, "item")
+		fieldData.Expr = encodeExpr(protoFile, field, "item")
 		fieldData.IsStringKey = field.Desc.MapKey().Kind() == protoreflect.StringKind
 
 		return fieldData
@@ -138,29 +138,29 @@ func getFieldDataForEncode(field *protogen.Field) EncodeField {
 
 	if field.Message != nil {
 		fieldData := &MessageEncodeField{BaseEncodeField: base}
-		fieldData.Expr = encodePresenceExpr(field, accessor)
+		fieldData.Expr = encodePresenceExpr(protoFile, field, accessor)
 
 		return fieldData
 	}
 
 	if isOptionalScalar(field) {
 		fieldData := &OptionalEncodeField{BaseEncodeField: base}
-		fieldData.Expr = encodeExpr(field, accessor)
+		fieldData.Expr = encodeExpr(protoFile, field, accessor)
 
 		return fieldData
 	}
 
 	fieldData := &ScalarEncodeField{BaseEncodeField: base}
-	fieldData.Expr = encodeExpr(field, accessor)
+	fieldData.Expr = encodeExpr(protoFile, field, accessor)
 
 	return fieldData
 }
 
-func encodeExpr(field *protogen.Field, x string) string {
+func encodeExpr(protoFile *protogen.GeneratedFile, field *protogen.Field, x string) string {
 	// A map is represented by a synthetic MapEntry message.
 	// Fields[0] = key, Fields[1] = value.
 	if field.Message != nil && field.Desc.IsMap() {
-		return encodeExpr(field.Message.Fields[1], x)
+		return encodeExpr(protoFile, field.Message.Fields[1], x)
 	}
 
 	if field.Message != nil {
@@ -172,20 +172,20 @@ func encodeExpr(field *protogen.Field, x string) string {
 	}
 
 	if isOptionalScalar(field) {
-		return encodeScalar(field.Desc.Kind(), "*"+x)
+		return encodeScalar(protoFile, field.Desc.Kind(), "*"+x)
 	}
 
-	return encodeScalar(field.Desc.Kind(), x)
+	return encodeScalar(protoFile, field.Desc.Kind(), x)
 }
 
-func encodePresenceExpr(field *protogen.Field, x string) string {
+func encodePresenceExpr(protoFile *protogen.GeneratedFile, field *protogen.Field, x string) string {
 	if field.Message != nil {
 		return "frankenPHPEncode" + field.Message.GoIdent.GoName + "(" + x + ")"
 	}
-	return encodeScalar(field.Desc.Kind(), "*"+x)
+	return encodeScalar(protoFile, field.Desc.Kind(), "*"+x)
 }
 
-func encodeScalar(kind protoreflect.Kind, x string) string {
+func encodeScalar(protoFile *protogen.GeneratedFile, kind protoreflect.Kind, x string) string {
 	switch kind {
 	case protoreflect.FloatKind:
 		return "float64(" + x + ")"
@@ -194,7 +194,7 @@ func encodeScalar(kind protoreflect.Kind, x string) string {
 	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
 		return "int64(" + x + ")"
 	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-		return "strconv.FormatUint(uint64(" + x + "), 10)"
+		return protoFile.QualifiedGoIdent(strconvPackage.Ident("FormatUint")) + "(uint64(" + x + "), 10)"
 	case protoreflect.BytesKind:
 		return "string(" + x + ")"
 	default:

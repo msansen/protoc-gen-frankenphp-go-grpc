@@ -82,6 +82,7 @@ func templateFunctions(protoFile *protogen.GeneratedFile) template.FuncMap {
 			return 1
 		},
 		"context":        qualifiedGoIdent(contextPackage),
+		"runtime":        qualifiedGoIdent(runtimePackage),
 		"fmt":            qualifiedGoIdent(fmtPackage),
 		"strconv":        qualifiedGoIdent(strconvPackage),
 		"io":             qualifiedGoIdent(ioPackage),

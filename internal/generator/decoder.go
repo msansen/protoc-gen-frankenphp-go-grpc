@@ -146,7 +146,7 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 			fieldData.MessageType = protoFile.QualifiedGoIdent(field.Message.GoIdent)
 		} else {
 			fieldData.GoType = goTypeForField(field)
-			fieldData.DecodeHelper = decodeHelper(field, "raw")
+			fieldData.DecodeHelper = decodeHelper(protoFile, field, "raw")
 		}
 
 		return fieldData
@@ -159,7 +159,7 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 			fieldData.HasMessage = true
 			fieldData.MessageGoName = field.Message.GoIdent.GoName
 		} else {
-			fieldData.DecodeHelper = decodeHelper(field, "item")
+			fieldData.DecodeHelper = decodeHelper(protoFile, field, "item")
 		}
 
 		return fieldData
@@ -169,9 +169,9 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 		fieldData := &MapDecodeField{BaseDecodeField: base}
 		fieldData.KeyGoType = mapKeyType(field.Desc.MapKey().Kind())
 		fieldData.ValueGoType = goTypeForField(field)
-		fieldData.KeyHelper = "frankenPHPString"
+		fieldData.KeyHelper = protoFile.QualifiedGoIdent(runtimePackage.Ident("String"))
 		if field.Desc.MapKey().Kind() != protoreflect.StringKind {
-			fieldData.KeyHelper = "frankenPHPInt64"
+			fieldData.KeyHelper = protoFile.QualifiedGoIdent(runtimePackage.Ident("Int64"))
 		}
 
 		// A map is represented by a synthetic MapEntry message.
@@ -181,7 +181,7 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 			fieldData.HasMessage = true
 			fieldData.ValueMessageGoName = valueField.Message.GoIdent.GoName
 		} else {
-			fieldData.DecodeHelper = decodeHelper(field, "item")
+			fieldData.DecodeHelper = decodeHelper(protoFile, field, "item")
 			fieldData.ValueFieldGoType = goTypeForField(valueField)
 		}
 
@@ -199,35 +199,35 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 	if isOptionalScalar(field) {
 		fieldData := &OptionalDecodeField{BaseDecodeField: base}
 		fieldData.GoType = goTypeForField(field)
-		fieldData.DecodeHelper = decodeHelper(field, "raw")
+		fieldData.DecodeHelper = decodeHelper(protoFile, field, "raw")
 
 		return fieldData
 	}
 
 	fieldData := &ScalarDecodeField{BaseDecodeField: base}
 	fieldData.GoType = goTypeForField(field)
-	fieldData.DecodeHelper = decodeHelper(field, "raw")
+	fieldData.DecodeHelper = decodeHelper(protoFile, field, "raw")
 
 	return fieldData
 }
 
-func decodeHelper(field *protogen.Field, x string) string {
+func decodeHelper(protoFile *protogen.GeneratedFile, field *protogen.Field, x string) string {
 	kind := field.Desc.Kind()
 	switch kind {
 	case protoreflect.BoolKind:
-		return "frankenPHPBool(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("Bool")) + "(" + x + ")"
 	case protoreflect.StringKind:
-		return "frankenPHPString(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("String")) + "(" + x + ")"
 	case protoreflect.BytesKind:
-		return "frankenPHPBytes(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("Bytes")) + "(" + x + ")"
 	case protoreflect.DoubleKind, protoreflect.FloatKind:
-		return "frankenPHPFloat64(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("Float64")) + "(" + x + ")"
 	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-		return "frankenPHPUint64(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("Uint64")) + "(" + x + ")"
 	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-		return "frankenPHPUint64(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("Uint64")) + "(" + x + ")"
 	default:
-		return "frankenPHPInt64(" + x + ")"
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("Int64")) + "(" + x + ")"
 	}
 }
 

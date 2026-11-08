@@ -1,4 +1,5 @@
 BINARY := bin/protoc-gen-frankenphp-go-grpc
+FRANKENPHP_BUILDER_IMAGE ?= dunglas/frankenphp:1.13.4-builder
 
 ##
 ## protoc-gen-frankenphp-go-grpc
@@ -7,14 +8,14 @@ BINARY := bin/protoc-gen-frankenphp-go-grpc
 build:					## Builds the binary
 	go build -o $(BINARY) ./cmd/protoc-gen-frankenphp-go-grpc
 
-test:					## Runs the test files
-	go test ./...
+test:					## Tests the generator without native PHP libraries
+	go test ./cmd/... ./internal/...
 
 fmt:					## Runs gofmt
 	gofmt -w $$(find . -name '*.go' -not -path './testdata/generated/*')
 
-vet:					## Runs go vet
-	go vet ./...
+vet:					## Vets the generator without native PHP libraries
+	go vet ./cmd/... ./internal/...
 
 install:				## Installs protoc-gen-frankenphp-go-grpc
 	go install ./cmd/protoc-gen-frankenphp-go-grpc
@@ -47,3 +48,23 @@ help:
 	@grep -Eh '(^[a-zA-Z_-]+:.*?##.*$$)|(^##)' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[32m%-30s\033[0m %s\n", $$1, $$2}' | sed -e 's/\[32m##/[33m/'
 
 .PHONY: help
+
+##
+## runtime
+## -------
+##
+
+# These targets require the FrankenPHP native development environment.
+test-runtime:				## Tests the runtime (requires native FrankenPHP libraries)
+	go test ./runtime
+
+vet-runtime:				## Vets the runtime (requires native FrankenPHP libraries)
+	go vet ./runtime
+
+check-runtime-docker:		## Tests and vets the runtime in the FrankenPHP builder container
+	docker run --rm --entrypoint bash \
+		-v "$(CURDIR):/workspace:ro" -w /workspace \
+		$(FRANKENPHP_BUILDER_IMAGE) \
+		-c 'export CGO_CFLAGS="$${CGO_CFLAGS:-} $$(php-config --includes)"; make test-runtime vet-runtime'
+
+.PHONY: test-runtime vet-runtime check-runtime-docker

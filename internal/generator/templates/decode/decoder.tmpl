@@ -1,6 +1,6 @@
 func {{ .DecoderName }}(value any, out *{{ .TypeName }}) error {
     {{- if .HasFields }}
-        root, err := frankenPHPMap(value)
+        root, err := {{ runtime "Map" }}(value)
         if err != nil {
             return err
         }

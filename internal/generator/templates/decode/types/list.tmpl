@@ -1,4 +1,4 @@
-    items, err := frankenPHPList(raw);
+    items, err := {{ runtime "List" }}(raw);
     if err != nil {
         return err
     }

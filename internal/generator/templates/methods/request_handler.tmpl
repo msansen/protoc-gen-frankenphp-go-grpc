@@ -12,5 +12,5 @@ if !s.options.DisableEnvelope {
 response, err := {{ .RequestData.HandlerMethodName }}({{ .ContextExpr }}, request)
 
 if err == nil && !s.options.DisableEnvelope {
-    response, err = frankenPHPUnwrapResponse(response, {{ envelopeFormatVersion }})
+    response, err = {{ runtime "UnwrapResponse" }}(response, {{ envelopeFormatVersion }})
 }

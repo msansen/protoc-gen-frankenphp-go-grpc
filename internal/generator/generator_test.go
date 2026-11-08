@@ -2,6 +2,9 @@ package generator
 
 import (
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -215,5 +218,62 @@ func TestInvalidTemplateDirectory(t *testing.T) {
 	cfg.TemplateDir = filepath.Join(t.TempDir(), "missing")
 	if err := Generate(plugin, cfg, "test"); err == nil {
 		t.Fatal("expected an error for missing template directory")
+	}
+}
+
+// Shared message codecs are deliberately left for a separate regression test:
+// this test verifies that only the common runtime helpers have been extracted.
+func TestMultipleFilesUseSharedRuntime(t *testing.T) {
+	compiler := protocompile.Compiler{Resolver: &protocompile.SourceResolver{
+		ImportPaths: []string{filepath.Join("..", "..", "testdata", "proto")},
+	}}
+	names := []string{"server-test.proto", "second-service-test.proto"}
+	files, err := compiler.Compile(context.Background(), names...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &pluginpb.CodeGeneratorRequest{FileToGenerate: names}
+	for _, file := range files {
+		req.ProtoFile = append(req.ProtoFile, protodesc.ToFileDescriptorProto(file))
+	}
+	plugin, err := (protogen.Options{}).New(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Generate(plugin, DefaultConfig(), "test"); err != nil {
+		t.Fatal(err)
+	}
+	response := plugin.Response()
+	if response.GetError() != "" {
+		t.Fatal(response.GetError())
+	}
+	if len(response.File) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(response.File))
+	}
+	for _, file := range response.File {
+		content := file.GetContent()
+		if !strings.Contains(content, `"github.com/msansen/protoc-gen-frankenphp-go-grpc/runtime"`) {
+			t.Fatalf("%s does not import the shared runtime", file.GetName())
+		}
+		for _, want := range []string{"runtime.Map(value)", "runtime.UnwrapResponse(response, 1)"} {
+			if !strings.Contains(content, want) {
+				t.Errorf("%s does not call %s", file.GetName(), want)
+			}
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), file.GetName(), content, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range parsed.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil {
+				continue
+			}
+			if strings.HasPrefix(fn.Name.Name, "frankenPHP") &&
+				!strings.HasPrefix(fn.Name.Name, "frankenPHPEncode") &&
+				!strings.HasPrefix(fn.Name.Name, "frankenPHPDecode") {
+				t.Errorf("%s still declares runtime helper %s", file.GetName(), fn.Name.Name)
+			}
+		}
 	}
 }

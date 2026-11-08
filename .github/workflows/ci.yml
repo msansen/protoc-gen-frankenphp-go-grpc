@@ -12,15 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ['1.24.x', '1.25.x']
+        go: ['1.27.x']
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
           cache: true
-      - run: go test ./...
-      - run: go vet ./...
+      - run: make test
+      - run: make vet
       - run: test -z "$(gofmt -l .)"
 
   build:
@@ -29,6 +29,18 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.25.x'
+          go-version: '1.27.x'
           cache: true
       - run: go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" ./cmd/protoc-gen-frankenphp-go-grpc
+
+  runtime:
+    runs-on: ubuntu-latest
+    container:
+      image: dunglas/frankenphp:1.13.4-builder
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test and vet the runtime with native FrankenPHP libraries
+        shell: bash
+        run: |
+          export CGO_CFLAGS="${CGO_CFLAGS:-} $(php-config --includes)"
+          make test-runtime vet-runtime
