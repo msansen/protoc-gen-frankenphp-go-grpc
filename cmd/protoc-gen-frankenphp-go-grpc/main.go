@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"runtime/debug"
 
 	"github.com/msansen/protoc-gen-frankenphp-go-grpc/internal/generator"
 	"google.golang.org/protobuf/compiler/protogen"
@@ -30,13 +31,28 @@ func main() {
 		"accepted for protoc convention compatibility; output placement is handled by protogen",
 	)
 
+	info, _ := debug.ReadBuildInfo()
+	buildVersion := resolveVersion(version, info)
+
 	opts := protogen.Options{ParamFunc: flags.Set}
 	opts.Run(
 		func(plugin *protogen.Plugin) error {
 			plugin.SupportedFeatures =
 				uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
 
-			return generator.Generate(plugin, cfg, version)
+			return generator.Generate(plugin, cfg, buildVersion)
 		},
 	)
+}
+
+func resolveVersion(internal string, info *debug.BuildInfo) string {
+	if internal != "" && internal != "dev" {
+		return internal
+	}
+
+	if info != nil && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+
+	return "dev"
 }
