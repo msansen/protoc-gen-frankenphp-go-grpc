@@ -285,6 +285,28 @@ Buf invokes the plugin once **per input** with `strategy: all`, so keep service 
 
 Converters are still being developed. See [known limitations and planned corrections](TODO.md), particularly for maps, imported types, optional enums, and multiple generated files in one Go package. Validate the types your service uses before relying on these representations.
 
+### PHPStan handler parameter documentation
+
+Each generated gRPC method includes a Go comment containing a PHPDoc block you can copy onto the corresponding PHP handler. It describes the request payload **without the bridge envelope**, for example:
+
+```php
+/**
+ * @param array{
+ *     name: string,
+ * } $request
+ */
+public function sayHello(array $request): array
+{
+    return ['message' => 'Hello ' . $request['name']];
+}
+```
+
+The generated [PHPStan array shapes](https://phpstan.org/writing-php-code/phpdoc-types#array-shapes) follow protobuf field names and the encoder's representation. Optional scalars, oneof alternatives, singular messages, lists, and maps have optional keys when the encoder can omit them. Nested messages are expanded, repeated fields use `list<T>`, maps use `array<array-key, T>`, enums use `int`, bytes use `string`, and unsigned 64-bit values use `numeric-string`. Message elements in lists and maps also allow `null`, since the Go encoder accepts nil entries.
+
+Client-streaming handlers receive a list of request shapes. Unary, server-streaming, and bidirectional handlers receive one request shape per PHP invocation. Recursive references and messages nested eight levels deep are represented as `array<string, mixed>` to keep the inline documentation finite. Oneof keys are individually optional; the shape does not express their mutual exclusion.
+
+The example applies to the payload after envelope extraction, or directly to the handler argument when envelopes are disabled. Rename `$request` in the copied PHPDoc to match your handler parameter.
+
 ### Disable envelopes
 
 Set `DisableEnvelope: true` in the generated service options to exchange raw payloads:

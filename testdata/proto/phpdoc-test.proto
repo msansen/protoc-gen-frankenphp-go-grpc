@@ -1,0 +1,44 @@
+syntax = "proto3";
+package phpdoc.v1;
+option go_package = "example.com/phpdoc;phpdoc";
+
+message Request {
+  string name = 1;
+  optional string nickname = 2;
+  bytes data = 3;
+  uint64 large_id = 4;
+  fixed64 fixed_id = 5;
+  repeated uint64 ids = 6;
+  map<int32, bytes> blobs = 7;
+  map<bool, Child> children = 8;
+  repeated Child nodes = 9;
+  Child child = 10;
+  Status status = 11;
+  float ratio = 12;
+  double amount = 13;
+  bool enabled = 14;
+  int64 count = 15;
+  sint32 offset = 16;
+  sfixed64 code = 17;
+  oneof selection {
+    string token = 18;
+    Child selected = 19;
+  }
+  Node tree = 20;
+}
+message Child { string value = 1; }
+message Node {
+  string value = 1;
+  Node next = 2;
+  repeated Node children = 3;
+  map<string, Node> indexed = 4;
+}
+message Empty {}
+enum Status { UNKNOWN = 0; ACTIVE = 1; }
+service PHPDocService {
+  rpc Unary(Request) returns (Empty);
+  rpc ServerStream(Request) returns (stream Empty);
+  rpc ClientStream(stream Request) returns (Empty);
+  rpc BidiStream(stream Request) returns (stream Empty);
+  rpc EmptyRequest(Empty) returns (Empty);
+}

@@ -44,6 +44,7 @@ type serviceData struct {
 }
 
 type methodData struct {
+	PHPDoc                []string
 	ServerName            string
 	MethodName            string
 	Context               string
@@ -241,6 +242,7 @@ func newMethodData(
 ) (*methodData, error) {
 	fullMethod := fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())
 	data := methodData{
+		PHPDoc:            handlerPHPDoc(method),
 		ServerName:        serverName,
 		MethodName:        method.GoName,
 		Context:           protoFile.QualifiedGoIdent(contextPackage.Ident("Context")),

@@ -1,3 +1,4 @@
+{{ template "methods/phpdoc.tmpl" . }}
 func (s *{{ .ServerName }}) {{ .MethodName }}(ctx {{ .Context }}, in *{{ .Input }}) (*{{ .Output }}, error) {
 	if s.options.{{ .MethodName }} != nil { return s.options.{{ .MethodName }}(ctx, in) }
 	payload := {{ .RequestEncoder }}(in)
