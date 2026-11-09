@@ -63,6 +63,7 @@ type ListDecodeField struct {
 	HasMessage bool `default:"false"`
 
 	ElementGoType string
+	MessageType   string
 	MessageGoName string
 	DecodeHelper  string
 }
@@ -78,8 +79,9 @@ type MapDecodeField struct {
 
 	KeyGoType          string
 	ValueGoType        string
-	KeyHelper          string
+	KeyDecodeExpr      string
 	ValueMessageGoName string
+	ValueMessageType   string
 	DecodeHelper       string
 	ValueFieldGoType   string
 }
@@ -135,7 +137,7 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 	if field.Oneof != nil && !field.Oneof.Desc.IsSynthetic() {
 		fieldData := &OneofDecodeField{
 			BaseDecodeField: base,
-			WrapperName:     field.Parent.GoIdent.GoName + "_" + field.GoName,
+			WrapperName:     oneofWrapper(protoFile, field),
 		}
 
 		fieldData.Target = field.Oneof.GoName
@@ -145,7 +147,7 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 			fieldData.MessageGoName = field.Message.GoIdent.GoName
 			fieldData.MessageType = protoFile.QualifiedGoIdent(field.Message.GoIdent)
 		} else {
-			fieldData.GoType = goTypeForField(field)
+			fieldData.GoType = goTypeForField(protoFile, field)
 			fieldData.DecodeHelper = decodeHelper(protoFile, field, "raw")
 		}
 
@@ -154,10 +156,11 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 
 	if field.Desc.IsList() {
 		fieldData := &ListDecodeField{BaseDecodeField: base}
-		fieldData.ElementGoType = goTypeForField(field)
+		fieldData.ElementGoType = goTypeForField(protoFile, field)
 		if field.Message != nil {
 			fieldData.HasMessage = true
 			fieldData.MessageGoName = field.Message.GoIdent.GoName
+			fieldData.MessageType = protoFile.QualifiedGoIdent(field.Message.GoIdent)
 		} else {
 			fieldData.DecodeHelper = decodeHelper(protoFile, field, "item")
 		}
@@ -168,11 +171,8 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 	if field.Desc.IsMap() {
 		fieldData := &MapDecodeField{BaseDecodeField: base}
 		fieldData.KeyGoType = mapKeyType(field.Desc.MapKey().Kind())
-		fieldData.ValueGoType = goTypeForField(field)
-		fieldData.KeyHelper = protoFile.QualifiedGoIdent(runtimePackage.Ident("String"))
-		if field.Desc.MapKey().Kind() != protoreflect.StringKind {
-			fieldData.KeyHelper = protoFile.QualifiedGoIdent(runtimePackage.Ident("Int64"))
-		}
+		fieldData.ValueGoType = goTypeForField(protoFile, field)
+		fieldData.KeyDecodeExpr = mapKeyDecodeExpr(protoFile, field.Desc.MapKey().Kind())
 
 		// A map is represented by a synthetic MapEntry message.
 		// Fields[0] = key, Fields[1] = value.
@@ -180,9 +180,10 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 		if valueField.Message != nil {
 			fieldData.HasMessage = true
 			fieldData.ValueMessageGoName = valueField.Message.GoIdent.GoName
+			fieldData.ValueMessageType = protoFile.QualifiedGoIdent(valueField.Message.GoIdent)
 		} else {
-			fieldData.DecodeHelper = decodeHelper(protoFile, field, "item")
-			fieldData.ValueFieldGoType = goTypeForField(valueField)
+			fieldData.DecodeHelper = decodeHelper(protoFile, valueField, "item")
+			fieldData.ValueFieldGoType = goTypeForField(protoFile, valueField)
 		}
 
 		return fieldData
@@ -198,14 +199,14 @@ func getFieldDataForDecode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 
 	if isOptionalScalar(field) {
 		fieldData := &OptionalDecodeField{BaseDecodeField: base}
-		fieldData.GoType = goTypeForField(field)
+		fieldData.GoType = goTypeForField(protoFile, field)
 		fieldData.DecodeHelper = decodeHelper(protoFile, field, "raw")
 
 		return fieldData
 	}
 
 	fieldData := &ScalarDecodeField{BaseDecodeField: base}
-	fieldData.GoType = goTypeForField(field)
+	fieldData.GoType = goTypeForField(protoFile, field)
 	fieldData.DecodeHelper = decodeHelper(protoFile, field, "raw")
 
 	return fieldData
@@ -245,5 +246,24 @@ func mapKeyType(kind protoreflect.Kind) string {
 		return "uint32"
 	default:
 		return "uint64"
+	}
+}
+
+// Map exposes PHP associative-array keys as strings. Parse keys separately from
+// values, preserving signedness and rejecting values outside the protobuf range.
+func mapKeyDecodeExpr(protoFile *protogen.GeneratedFile, kind protoreflect.Kind) string {
+	switch kind {
+	case protoreflect.StringKind:
+		return protoFile.QualifiedGoIdent(runtimePackage.Ident("String")) + "(key)"
+	case protoreflect.BoolKind:
+		return protoFile.QualifiedGoIdent(strconvPackage.Ident("ParseBool")) + "(key)"
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return protoFile.QualifiedGoIdent(strconvPackage.Ident("ParseInt")) + "(key, 10, 32)"
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return protoFile.QualifiedGoIdent(strconvPackage.Ident("ParseInt")) + "(key, 10, 64)"
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return protoFile.QualifiedGoIdent(strconvPackage.Ident("ParseUint")) + "(key, 10, 32)"
+	default:
+		return protoFile.QualifiedGoIdent(strconvPackage.Ident("ParseUint")) + "(key, 10, 64)"
 	}
 }

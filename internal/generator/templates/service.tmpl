@@ -7,7 +7,7 @@ type {{ .OptionsName }} struct {
 }
 
 type {{ .ServerName }} struct {
-	Unimplemented{{ .ServiceName }}Server
+	{{ .UnimplementedServer }}
 	options {{ .OptionsName }}
 }
 
@@ -16,7 +16,7 @@ func {{ .ConstructorName }}(options {{ .OptionsName }}) *{{ .ServerName }} {
 }
 
 func {{ .RegisterName }}(registrar {{ .ServiceRegistrar }}, options {{ .OptionsName }}) {
-	Register{{ .ServiceName }}Server(registrar, {{ .ConstructorName }}(options))
+	{{ .RegisterService }}(registrar, {{ .ConstructorName }}(options))
 }
 
 // Service methods

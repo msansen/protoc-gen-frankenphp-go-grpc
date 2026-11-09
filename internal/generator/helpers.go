@@ -26,23 +26,19 @@ func isOptionalScalar(field *protogen.Field) bool {
 		(field.Oneof == nil || field.Oneof.Desc.IsSynthetic())
 }
 
-func goTypeForField(field *protogen.Field) string {
+func goTypeForField(protoFile *protogen.GeneratedFile, field *protogen.Field) string {
 	if field.Enum != nil {
-		return field.Enum.GoIdent.GoName
+		return protoFile.QualifiedGoIdent(field.Enum.GoIdent)
 	}
 
 	// A map is represented by a synthetic MapEntry message.
 	// Fields[0] = key, Fields[1] = value.
 	if field.Desc.IsMap() {
-		return goTypeForField(field.Message.Fields[1])
+		return goTypeForField(protoFile, field.Message.Fields[1])
 	}
 
 	if field.Message != nil {
-		return "*" + field.Message.GoIdent.GoName
-	}
-
-	if field.Enum != nil {
-		return field.Enum.GoIdent.GoName
+		return "*" + protoFile.QualifiedGoIdent(field.Message.GoIdent)
 	}
 
 	switch field.Desc.Kind() {
@@ -65,4 +61,8 @@ func goTypeForField(field *protogen.Field) string {
 	default:
 		return "int32"
 	}
+}
+
+func oneofWrapper(protoFile *protogen.GeneratedFile, field *protogen.Field) string {
+	return protoFile.QualifiedGoIdent(field.GoIdent)
 }

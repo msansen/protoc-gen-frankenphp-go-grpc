@@ -115,7 +115,7 @@ func getFieldDataForEncode(protoFile *protogen.GeneratedFile, field *protogen.Fi
 	if field.Oneof != nil && !field.Oneof.Desc.IsSynthetic() {
 		fieldData := &OneofEncodeField{BaseEncodeField: base}
 		fieldData.Target = field.Oneof.GoName
-		fieldData.WrapperName = field.Parent.GoIdent.GoName + "_" + field.GoName
+		fieldData.WrapperName = oneofWrapper(protoFile, field)
 		fieldData.Expr = encodeExpr(protoFile, field, "in.Get"+field.GoName+"()")
 
 		return fieldData

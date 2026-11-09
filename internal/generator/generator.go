@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
@@ -31,13 +32,15 @@ type fileData struct {
 }
 
 type serviceData struct {
-	OptionsName      string
-	ServerName       string
-	ServiceName      string
-	ConstructorName  string
-	RegisterName     string
-	ServiceRegistrar string
-	Methods          []methodData
+	OptionsName         string
+	ServerName          string
+	ServiceName         string
+	ConstructorName     string
+	RegisterName        string
+	ServiceRegistrar    string
+	UnimplementedServer string
+	RegisterService     string
+	Methods             []methodData
 }
 
 type methodData struct {
@@ -69,18 +72,33 @@ func Generate(plugin *protogen.Plugin, cfg Config, version string) error {
 		return fmt.Errorf("file_suffix must end in .go")
 	}
 
+	outputPath, outputName, err := parseOutputPackage(cfg.OutputPackage)
+	if err != nil {
+		return err
+	}
 	// Codec declarations are package-scoped, even when services span proto files.
 	codecsByPackage := make(map[protogen.GoImportPath]*CodecRegistry)
 	for _, file := range plugin.Files {
 		if !file.Generate || len(file.Services) == 0 {
 			continue
 		}
-		registry := codecsByPackage[file.GoImportPath]
+
+		// Handles different output package.
+		packagePath := file.GoImportPath
+		if outputPath != "" {
+			packagePath = outputPath
+			if packagePath == file.GoImportPath && outputName != file.GoPackageName {
+				return fmt.Errorf("output_package name %q conflicts with existing package name %q for %s", outputName, file.GoPackageName, packagePath)
+			}
+		}
+
+		registry := codecsByPackage[packagePath]
 		if registry == nil {
 			registry = NewCodecRegistry()
-			codecsByPackage[file.GoImportPath] = registry
+			codecsByPackage[packagePath] = registry
 		}
-		if err := generateFile(plugin, file, cfg, version, registry); err != nil {
+
+		if err := generateFile(plugin, file, cfg, version, registry, packagePath, outputName); err != nil {
 			return err
 		}
 	}
@@ -94,8 +112,27 @@ func generateFile(
 	cfg Config,
 	version string,
 	emittedCodecs *CodecRegistry,
+	packagePath protogen.GoImportPath,
+	outputName protogen.GoPackageName,
 ) error {
-	protoFile := plugin.NewGeneratedFile(file.GeneratedFilenamePrefix+cfg.FileSuffix, file.GoImportPath)
+	prefix := file.GeneratedFilenamePrefix
+
+	// Handles different output package.
+	packageName := file.GoPackageName
+	if outputName != "" {
+		packageName = outputName
+		sourceRelative := false
+		for _, parameter := range strings.Split(plugin.Request.GetParameter(), ",") {
+			if name, value, _ := strings.Cut(parameter, "="); name == "paths" {
+				sourceRelative = value == "source_relative"
+			}
+		}
+		if !sourceRelative {
+			prefix = path.Join(string(packagePath), path.Base(prefix))
+		}
+	}
+
+	protoFile := plugin.NewGeneratedFile(prefix+cfg.FileSuffix, packagePath)
 	templates, err := loadTemplates(cfg.TemplateDir, protoFile)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
@@ -107,7 +144,7 @@ func generateFile(
 	fileData := &fileData{
 		Version: version,
 		Source:  file.Desc.Path(),
-		Package: string(file.GoPackageName),
+		Package: string(packageName),
 		Body:    body.String(),
 	}
 
@@ -119,7 +156,7 @@ func generateFile(
 	}
 
 	for _, service := range file.Services {
-		serviceData, err := newServiceData(protoFile, service, cfg)
+		serviceData, err := newServiceData(protoFile, service, file.GoImportPath, cfg)
 
 		if err != nil {
 			return fmt.Errorf("render service %s: %w", service.Desc.FullName(), err)
@@ -169,19 +206,21 @@ func generateFile(
 	return nil
 }
 
-func newServiceData(protoFile *protogen.GeneratedFile, service *protogen.Service, cfg Config) (*serviceData, error) {
+func newServiceData(protoFile *protogen.GeneratedFile, service *protogen.Service, serviceImportPath protogen.GoImportPath, cfg Config) (*serviceData, error) {
 	serverName := service.GoName + "FrankenPHPServer"
 	data := &serviceData{
-		OptionsName:      service.GoName + "FrankenPHPOptions",
-		ServerName:       serverName,
-		ServiceName:      service.GoName,
-		ConstructorName:  "New" + service.GoName + "FrankenPHPServer",
-		RegisterName:     "Register" + service.GoName + "FrankenPHPServer",
-		ServiceRegistrar: protoFile.QualifiedGoIdent(grpcPackage.Ident("ServiceRegistrar")),
+		OptionsName:         service.GoName + "FrankenPHPOptions",
+		ServerName:          serverName,
+		ServiceName:         service.GoName,
+		ConstructorName:     "New" + service.GoName + "FrankenPHPServer",
+		RegisterName:        "Register" + service.GoName + "FrankenPHPServer",
+		ServiceRegistrar:    protoFile.QualifiedGoIdent(grpcPackage.Ident("ServiceRegistrar")),
+		UnimplementedServer: protoFile.QualifiedGoIdent(serviceImportPath.Ident("Unimplemented" + service.GoName + "Server")),
+		RegisterService:     protoFile.QualifiedGoIdent(serviceImportPath.Ident("Register" + service.GoName + "Server")),
 	}
 
 	for _, method := range service.Methods {
-		methodData, err := newMethodData(protoFile, service, method, serverName, cfg)
+		methodData, err := newMethodData(protoFile, service, method, serverName, serviceImportPath, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -197,6 +236,7 @@ func newMethodData(
 	service *protogen.Service,
 	method *protogen.Method,
 	serverName string,
+	serviceImportPath protogen.GoImportPath,
 	cfg Config,
 ) (*methodData, error) {
 	fullMethod := fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())
@@ -206,7 +246,7 @@ func newMethodData(
 		Context:           protoFile.QualifiedGoIdent(contextPackage.Ident("Context")),
 		Input:             protoFile.QualifiedGoIdent(method.Input.GoIdent),
 		Output:            protoFile.QualifiedGoIdent(method.Output.GoIdent),
-		Stream:            service.GoName + "_" + method.GoName + "Server",
+		Stream:            protoFile.QualifiedGoIdent(serviceImportPath.Ident(service.GoName + "_" + method.GoName + "Server")),
 		RequestEncoder:    "frankenPHPEncode" + method.Input.GoIdent.GoName,
 		ResponseDecoder:   "frankenPHPDecode" + method.Output.GoIdent.GoName,
 		StreamItemDecoder: "frankenPHPDecode" + method.Output.GoIdent.GoName,

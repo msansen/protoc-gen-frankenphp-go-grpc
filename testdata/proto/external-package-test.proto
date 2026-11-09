@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package external.v1;
+
+import "server-test.proto";
+
+option go_package = "github.com/msansen/protoc-gen-frankenphp-go-grpc/testdata/external;external";
+
+message Payload {
+  test.v1.Credentials credentials = 1;
+  repeated test.v1.Credentials history = 2;
+  map<string, test.v1.Credentials> contacts = 3;
+  map<string, test.v1.Status> statuses = 4;
+  repeated test.v1.Status states = 5;
+  oneof choice {
+    test.v1.Credentials identity = 6;
+    test.v1.Status state = 7;
+  }
+  map<bool, string> bool_keys = 8;
+  map<int32, string> int32_keys = 9;
+  map<uint32, string> uint32_keys = 10;
+  map<int64, string> int64_keys = 11;
+  map<uint64, string> uint64_keys = 12;
+}
+
+service ExternalService {
+  rpc Unary(Payload) returns (Payload);
+  rpc ServerStream(Payload) returns (stream Payload);
+  rpc ClientStream(stream Payload) returns (Payload);
+  rpc BidiStream(stream Payload) returns (stream Payload);
+}

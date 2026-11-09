@@ -303,3 +303,111 @@ func TestMultipleFilesUseSharedRuntime(t *testing.T) {
 		}
 	}
 }
+
+func TestOutputPackage(t *testing.T) {
+	for _, tc := range []struct{ name, parameter, output, filename, packageName string }{
+		{"import paths", "", "example.com/bridge", "example.com/bridge/external-package-test_frankenphp_grpc.pb.go", "bridge"},
+		{"source relative", "paths=source_relative", "example.com/bridge", "external-package-test_frankenphp_grpc.pb.go", "bridge"},
+		{"module", "module=example.com", "example.com/bridge", "bridge/external-package-test_frankenphp_grpc.pb.go", "bridge"},
+		{"explicit name", "", "example.com/bridge;adapter", "example.com/bridge/external-package-test_frankenphp_grpc.pb.go", "adapter"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := externalPackageRequest(t)
+			req.Parameter = &tc.parameter
+			plugin, err := (protogen.Options{}).New(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg := DefaultConfig()
+			cfg.OutputPackage = tc.output
+			if err := Generate(plugin, cfg, "test"); err != nil {
+				t.Fatal(err)
+			}
+			resp := plugin.Response()
+			if resp.GetError() != "" {
+				t.Fatal(resp.GetError())
+			}
+			if len(resp.File) != 1 {
+				t.Fatalf("expected 1 file, got %d", len(resp.File))
+			}
+			file := resp.File[0]
+			if file.GetName() != tc.filename {
+				t.Fatalf("filename = %q, want %q", file.GetName(), tc.filename)
+			}
+			content := file.GetContent()
+			for _, want := range []string{
+				"package " + tc.packageName,
+				`"github.com/msansen/protoc-gen-frankenphp-go-grpc/testdata/external"`,
+				`"github.com/msansen/protoc-gen-frankenphp-go-grpc/testdata/generated"`,
+				"external.UnimplementedExternalServiceServer",
+				"external.RegisterExternalServiceServer(registrar",
+				"stream external.ExternalService_ServerStreamServer",
+				"stream external.ExternalService_ClientStreamServer",
+				"stream external.ExternalService_BidiStreamServer",
+				"in *external.Payload",
+				"out *external.Payload",
+				"in.Choice.(*external.Payload_Identity)",
+				"&external.Payload_State{",
+				"&generated.Credentials{}",
+				"make([]*generated.Credentials",
+				"make(map[string]*generated.Credentials",
+				"make(map[string]generated.Status",
+				"make([]generated.Status",
+				"generated.Status(v)",
+				"strconv.ParseBool(key)",
+				"strconv.ParseInt(key, 10, 32)",
+				"strconv.ParseInt(key, 10, 64)",
+				"strconv.ParseUint(key, 10, 32)",
+				"strconv.ParseUint(key, 10, 64)",
+			} {
+				if !strings.Contains(content, want) {
+					t.Errorf("output missing %q\n%s", want, content)
+				}
+			}
+		})
+	}
+}
+
+func TestInvalidOutputPackage(t *testing.T) {
+	for _, value := range []string{";bridge", "example.com/bridge;", "example.com/bridge;for", "example.com/bridge;_", "example.com/bridge;bad-name", "/absolute", "../relative", "example.com//bridge", "example.com/bridge/", "example.com/bad name"} {
+		t.Run(value, func(t *testing.T) {
+			plugin, err := (protogen.Options{}).New(fixtureRequest(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg := DefaultConfig()
+			cfg.OutputPackage = value
+			if err := Generate(plugin, cfg, "test"); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+}
+
+func externalPackageRequest(t *testing.T) *pluginpb.CodeGeneratorRequest {
+	t.Helper()
+	compiler := protocompile.Compiler{Resolver: &protocompile.SourceResolver{
+		ImportPaths: []string{filepath.Join("..", "..", "testdata", "proto")},
+	}}
+	files, err := compiler.Compile(context.Background(), "server-test.proto", "external-package-test.proto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &pluginpb.CodeGeneratorRequest{FileToGenerate: []string{"external-package-test.proto"}}
+	for _, file := range files {
+		req.ProtoFile = append(req.ProtoFile, protodesc.ToFileDescriptorProto(file))
+	}
+	return req
+}
+
+func TestOutputPackageRejectsConflictingName(t *testing.T) {
+	plugin, err := (protogen.Options{}).New(fixtureRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.OutputPackage = string(plugin.Files[0].GoImportPath) + ";bridge"
+	if err := Generate(plugin, cfg, "test"); err == nil {
+		t.Fatal("expected an error for conflicting names at the same import path")
+	}
+}

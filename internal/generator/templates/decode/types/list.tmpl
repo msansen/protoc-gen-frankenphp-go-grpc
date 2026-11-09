@@ -5,7 +5,7 @@
     out.{{ .GoName }} = make([]{{ .ElementGoType }}, 0, len(items))
     for _, item := range items {
         {{- if .HasMessage }}
-            v := &{{ .MessageGoName }}{}
+            v := &{{ .MessageType }}{}
             if err := frankenPHPDecode{{ .MessageGoName }}(item, v); err != nil {
                 return err
             }

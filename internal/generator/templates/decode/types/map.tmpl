@@ -5,13 +5,13 @@
 
     out.{{- .Target }} = make(map[{{- .KeyGoType }}]{{- .ValueGoType }}, len(m))
     for key, item := range m {
-        keyValue, err := {{ .KeyHelper }}({{- .Key }})
+        keyValue, err := {{ .KeyDecodeExpr }}
         if err != nil {
             return err
         }
 
         {{- if .HasMessage  }}
-            itemValue := &{{- .ValueMessageGoName }}{}
+            itemValue := &{{- .ValueMessageType }}{}
             if err := frankenPHPDecode{{- .ValueMessageGoName }}(item, itemValue); err != nil {
                 return err
             }

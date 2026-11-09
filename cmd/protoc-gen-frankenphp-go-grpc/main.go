@@ -15,6 +15,7 @@ func main() {
 	var paths string
 
 	cfg := generator.DefaultConfig()
+	flags.StringVar(&cfg.OutputPackage, "output_package", "", "Go import path of the bridge package, optionally followed by ;package_name")
 	flags.StringVar(&cfg.FileSuffix, "file_suffix", cfg.FileSuffix, "suffix of generated Go files")
 	flags.StringVar(
 		&cfg.TemplateDir,
