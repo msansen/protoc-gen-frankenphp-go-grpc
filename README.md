@@ -266,6 +266,21 @@ The converters use protobuf field names, such as `user_id`, rather than Go field
 
 Absent optional scalar fields and absent singular messages are omitted during encoding. A oneof emits only its selected member. Missing fields in a PHP response retain their Go zero value in the newly allocated response.
 
+When multiple service `.proto` files target the same Go package, generate them together in a single `protoc` invocation. Shared message encoders and decoders are emitted once per Go package for that invocation, including codecs for nested messages. Separate invocations do not share the codec registry and can still produce duplicate declarations.
+
+With Buf, local plugins use `strategy: directory` by default: files in the same directory are processed together, but different directories trigger separate plugin invocations. Set `strategy: all` for this plugin to process all files from each input together:
+
+```yaml
+version: v2
+plugins:
+  - local: protoc-gen-frankenphp-go-grpc
+    out: gen/go
+    opt: paths=source_relative
+    strategy: all
+```
+
+Buf invokes the plugin once **per input** with `strategy: all`, so keep service files that share codecs in the same input. Multiple inputs can still produce duplicate declarations if they target the same Go package and use shared messages. Remote plugins already use the `all` strategy. See the [Buf strategy documentation](https://buf.build/docs/configuration/v2/buf-gen-yaml/#strategy).
+
 Converters are still being developed. See [known limitations and planned corrections](TODO.md), particularly for maps, imported types, optional enums, and multiple generated files in one Go package. Validate the types your service uses before relying on these representations.
 
 ### Disable envelopes

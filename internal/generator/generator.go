@@ -69,11 +69,18 @@ func Generate(plugin *protogen.Plugin, cfg Config, version string) error {
 		return fmt.Errorf("file_suffix must end in .go")
 	}
 
+	// Codec declarations are package-scoped, even when services span proto files.
+	codecsByPackage := make(map[protogen.GoImportPath]*CodecRegistry)
 	for _, file := range plugin.Files {
 		if !file.Generate || len(file.Services) == 0 {
 			continue
 		}
-		if err := generateFile(plugin, file, cfg, version); err != nil {
+		registry := codecsByPackage[file.GoImportPath]
+		if registry == nil {
+			registry = NewCodecRegistry()
+			codecsByPackage[file.GoImportPath] = registry
+		}
+		if err := generateFile(plugin, file, cfg, version, registry); err != nil {
 			return err
 		}
 	}
@@ -86,6 +93,7 @@ func generateFile(
 	file *protogen.File,
 	cfg Config,
 	version string,
+	emittedCodecs *CodecRegistry,
 ) error {
 	protoFile := plugin.NewGeneratedFile(file.GeneratedFilenamePrefix+cfg.FileSuffix, file.GoImportPath)
 	templates, err := loadTemplates(cfg.TemplateDir, protoFile)
@@ -122,6 +130,10 @@ func generateFile(
 	// Generate concrete codecs only for messages reachable from RPC inputs/outputs.
 	for _, message := range codecRegistry.SortedEncoders() {
 		messageFullName := message.Desc.FullName()
+		if _, exists := emittedCodecs.encoders[messageFullName]; exists {
+			continue
+		}
+		emittedCodecs.encoders[messageFullName] = message
 
 		encoder, err := newMessageEncoderData(protoFile, message)
 		if err != nil {
@@ -133,6 +145,10 @@ func generateFile(
 
 	for _, message := range codecRegistry.SortedDecoders() {
 		messageFullName := message.Desc.FullName()
+		if _, exists := emittedCodecs.decoders[messageFullName]; exists {
+			continue
+		}
+		emittedCodecs.decoders[messageFullName] = message
 
 		decoder, err := newMessageDecoderData(protoFile, message)
 		if err != nil {

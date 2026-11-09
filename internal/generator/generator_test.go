@@ -221,8 +221,6 @@ func TestInvalidTemplateDirectory(t *testing.T) {
 	}
 }
 
-// Shared message codecs are deliberately left for a separate regression test:
-// this test verifies that only the common runtime helpers have been extracted.
 func TestMultipleFilesUseSharedRuntime(t *testing.T) {
 	compiler := protocompile.Compiler{Resolver: &protocompile.SourceResolver{
 		ImportPaths: []string{filepath.Join("..", "..", "testdata", "proto")},
@@ -250,12 +248,14 @@ func TestMultipleFilesUseSharedRuntime(t *testing.T) {
 	if len(response.File) != 2 {
 		t.Fatalf("expected 2 files, got %d", len(response.File))
 	}
+	codecDeclarations := make(map[string]string)
+	codecCalls := make(map[string]bool)
 	for _, file := range response.File {
 		content := file.GetContent()
 		if !strings.Contains(content, `"github.com/msansen/protoc-gen-frankenphp-go-grpc/runtime"`) {
 			t.Fatalf("%s does not import the shared runtime", file.GetName())
 		}
-		for _, want := range []string{"runtime.Map(value)", "runtime.UnwrapResponse(response, 1)"} {
+		for _, want := range []string{"runtime.UnwrapResponse(response, 1)"} {
 			if !strings.Contains(content, want) {
 				t.Errorf("%s does not call %s", file.GetName(), want)
 			}
@@ -264,16 +264,42 @@ func TestMultipleFilesUseSharedRuntime(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		ast.Inspect(parsed, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if ok {
+				if name, ok := call.Fun.(*ast.Ident); ok &&
+					(strings.HasPrefix(name.Name, "frankenPHPEncode") || strings.HasPrefix(name.Name, "frankenPHPDecode")) {
+					codecCalls[name.Name] = true
+				}
+			}
+			return true
+		})
 		for _, decl := range parsed.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Recv != nil {
 				continue
+			}
+			if strings.HasPrefix(fn.Name.Name, "frankenPHPEncode") || strings.HasPrefix(fn.Name.Name, "frankenPHPDecode") {
+				if previous, exists := codecDeclarations[fn.Name.Name]; exists {
+					t.Errorf("codec %s declared in both %s and %s", fn.Name.Name, previous, file.GetName())
+				}
+				codecDeclarations[fn.Name.Name] = file.GetName()
 			}
 			if strings.HasPrefix(fn.Name.Name, "frankenPHP") &&
 				!strings.HasPrefix(fn.Name.Name, "frankenPHPEncode") &&
 				!strings.HasPrefix(fn.Name.Name, "frankenPHPDecode") {
 				t.Errorf("%s still declares runtime helper %s", file.GetName(), fn.Name.Name)
 			}
+		}
+	}
+	for name := range codecCalls {
+		if _, exists := codecDeclarations[name]; !exists {
+			t.Errorf("codec call %s has no declaration", name)
+		}
+	}
+	for _, name := range []string{"frankenPHPEncodeUnaryRequest", "frankenPHPDecodeUnaryResponse", "frankenPHPEncodeCredentials"} {
+		if _, exists := codecDeclarations[name]; !exists {
+			t.Errorf("missing shared codec %s", name)
 		}
 	}
 }
